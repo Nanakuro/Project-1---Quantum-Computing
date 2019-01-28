@@ -61,7 +61,8 @@ def tensorProd(matrix_list):
     return product
 
 def HadamardArray(i,k):     # Apply Hadamard matrix to wire i out of k wires
-    Hadamard = 1/np.sqrt(2) * np.array([[1,1],[1,-1]])
+    Hadamard = 1/np.sqrt(2) * np.array([[1,1],
+                                        [1,-1]])
     M_list = []
     for j in range(k):
         if j == k-i-1:
@@ -74,19 +75,60 @@ def HadamardArray(i,k):     # Apply Hadamard matrix to wire i out of k wires
     return matrix
 
 def PhaseArray(i,k,phi):
-    Phase = np.array([[1,0],[0,np.exp(phi*1.j)]])
+    Phase = np.array([[1,           0],
+                      [0,   np.exp(phi*1.j)]])
     M_list = []
-    for j in range(k):
-        if j == k-i-1:
+    for w in range(k):
+        if w == k-i-1:
             M_list.append(Phase)
-            continue
-        M_list.append(np.identity(2))
+        else:
+            M_list.append(np.identity(2))
     
     matrix = tensorProd(M_list)
     print(matrix)
     return matrix
 
-def CNOT(i,j,k):
+# Currently only apply to target wires that is next to a control wire.
+def CNOTArray(control,target,total):
+    if total < 2:
+        print('Not enough number of qubits to implement CNOT gate.')
+    elif control == target:
+        print('Invalid placement of CNOT gate (control wire and target wire must be different)')
+    else:
+        CNOTdown = np.array([[1,0,0,0],
+                         [0,1,0,0],
+                         [0,0,0,1],
+                         [0,0,1,0]])    
+    
+        CNOTup = np.array([[1,0,0,0],
+                           [0,0,0,1],
+                           [0,0,1,0],
+                           [0,1,0,0]])
+        
+        M_list = []
+        w = 0
+        while w < total:
+            if target < control and w == total-1-control:
+                M_list.append(CNOTup)
+                w += 1
+            elif target > control and w == total-1-target:
+                M_list.append(CNOTdown)
+                w += 1
+            else:
+                M_list.append(np.identity(2))
+            w += 1
+        matrix = tensorProd(M_list)
+        #print(matrix)
+        return matrix
+                
+def ReadInput(fileName):
+        myInput_lines=open(fileName).readlines()
+        myInput=[]
+        numberOfWires=int(myInput_lines[0])
+        for line in myInput_lines[1:]:
+            myInput.append(line.split())
+        return (numberOfWires,myInput)
+    
     
 
 
@@ -109,5 +151,7 @@ def CNOT(i,j,k):
 #print(StateToVec(testState2))
 #print(VecToState(StateToVec(testState2)))
 
-HadamardArray(1,2)
-PhaseArray(0,2,0.1)
+#HadamardArray(1,2)
+#PhaseArray(0,2,0.1)
+dim = 3
+testState = [(i,'{0:b}'.format(i).zfill(dim)) for i in range(2**dim)]
