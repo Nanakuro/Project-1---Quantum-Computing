@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Jan 29 22:17:03 2019
+Created on Wed Jan 30 11:36:41 2019
 
 @author: Minh Nguyen
 """
@@ -10,17 +10,16 @@ import numpy as np
 import quantum_sim_module as qs
 from matplotlib import pyplot as plt
 
-
-def runCircuitIb(stateFile):
+def runCircuitIc(stateFile):
     n_wires, in_circuit = qs.ReadInput(stateFile)
     list_of_gates = []
     for inp in in_circuit:
         if inp[0] == 'H':
-            list_of_gates.append(qs.HadamardArray(int(inp[1]),n_wires))
+            list_of_gates.append(qs.HadamardSparse(int(inp[1]),n_wires))
         elif inp[0] == 'P':
-            list_of_gates.append(qs.PhaseArray(int(inp[1]),n_wires,float(inp[2])))
+            list_of_gates.append(qs.PhaseSparse(int(inp[1]),n_wires,float(inp[2])))
         elif inp[0] == 'CNOT':
-            list_of_gates.append(qs.CNOTArray(int(inp[1]),int(inp[2]), n_wires))
+            list_of_gates.append(qs.CNOTSparse(int(inp[1]),int(inp[2]), n_wires))
     in_vector = qs.StateToVec(qs.GetInputState(n_wires, in_circuit))
     out_vector = qs.computeState(in_vector,list_of_gates)
     tol = 1E-9
@@ -39,7 +38,7 @@ def runCircuitIb(stateFile):
         plt.title('Measurement histogram')
         plt.xlabel('State')
         plt.ylabel('Count')
-        plt.savefig('measure_circuit_Ib.png')
+        plt.savefig('measure_circuit_Ic.png')
     else:
         #qs.PrettyPrintBinary(out_state)
         qs.PrettyPrintInteger(out_state)
