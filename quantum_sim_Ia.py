@@ -8,14 +8,15 @@ Created on Wed Jan 23 10:09:53 2019
 
 import numpy as np
 from random import choices
+from matplotlib import pyplot as plt
 
 def PrettyPrintBinary(state):
     i = 1
     for s in state:
         if i == len(state):
-            print('{:g} |{:s}>'.format(s[0], s[1]))
+            print('({:g}) |{:s}>'.format(s[0], s[1]))
         else:
-            print('{:g} |{:s}>'.format(s[0], s[1]),end=' + ')
+            print('({:g}) |{:s}>'.format(s[0], s[1]),end=' + ')
         i += 1
 
 def PrettyPrintInteger(state):
@@ -23,9 +24,9 @@ def PrettyPrintInteger(state):
     for s in state:
         num = int(s[1],2)   # Convert binary string to base-10 integer
         if i == len(state):
-            print('{:g} |{:g}>'.format(s[0], num))
+            print('({:g}) |{:g}>'.format(s[0], num))
         else:
-            print('{:g} |{:g}>'.format(s[0], num),end=' + ')
+            print('({:g}) |{:g}>'.format(s[0], num),end=' + ')
         i += 1
     
 def StateToVec(state):  
@@ -194,7 +195,6 @@ def GetInputState(numberOfWires,input_circuit):
                     v = '%s+%sj' % (l[0],l[1])
                     v = v.replace(' ','')   # Clear white spaces
                     v = v.replace('+-','-') # Change '+-' to just '-'
-                    print(v)
                     vec.append(complex(v))
             return VecToState(vec)
         elif input_circuit[0][1] == 'BASIS':
@@ -206,7 +206,26 @@ def GetInputState(numberOfWires,input_circuit):
 
 
 def runCircuit(stateFile):
-    num_wires, input_circuit = ReadInput(stateFile)
+    n_wires, in_circuit = ReadInput(stateFile)
+    circuit_matrix = UnitaryMatrix(n_wires, in_circuit)
+    in_state = StateToVec(GetInputState(n_wires, in_circuit))
+    out_vector = circuit_matrix @ in_state
+    out_state = VecToState(out_vector)
+    if in_circuit[-1][0] == 'MEASURE':
+        count = 10000
+        measurements = []
+        for c in range(count):
+            measure = Measure(out_state)
+            index = int(measure,2)
+            measurements.append(index)
+        plt.hist(measurements,bins=2**n_wires)
+        plt.title('Measurement histogram')
+        plt.xlabel('State')
+        plt.ylabel('Count')
+        plt.show()
+    else:
+        #PrettyPrintBinary(out_state)
+        PrettyPrintInteger(out_state)
     
     
 
@@ -237,11 +256,15 @@ for i in range(2**dim): temp_sum += i
 testState = [(np.sqrt(i/temp_sum),'{0:b}'.format(i).zfill(dim)) for i in range(2**dim)]
 print(Measure(testState))
 '''
-#wires_total, gates = ReadInput('input.circuit')
+#wires_total, gates = ReadInput('rand.circuit')
 #print(wires_total)
 #print(gates)
 #print(UnitaryMatrix(wires_total,gates))
 
 #final_state = GetInputState(wires_total,gates)
 #print(final_state)
+
+runCircuit('rand.circuit')
+runCircuit('measure.circuit')
+runCircuit('input.circuit')
 
