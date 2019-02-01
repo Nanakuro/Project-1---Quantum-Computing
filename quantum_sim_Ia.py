@@ -28,10 +28,10 @@ def runCircuitIa(stateFile):
             measurements.append(index)
         fig = plt.figure()
         plt.hist(measurements,bins=2**n_wires)
-        plt.title('Measurement histogram')
+        plt.title('Measurement histogram - Ia (%d wires)' % n_wires)
         plt.xlabel('State')
         plt.ylabel('Count')
-        plt.savefig('measure_circuit_Ia.png')
+        plt.savefig('measure_circuit_Ia_%d_wires.png' % n_wires)
     else:
         #qs.PrettyPrintBinary(out_state)
         qs.PrettyPrintInteger(out_state)

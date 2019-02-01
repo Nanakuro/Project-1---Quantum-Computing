@@ -53,7 +53,7 @@ def VecToState(vector):
          
 ############################## Quantum Simulator Ia ###########################
 
-   
+'''   
 def tensorProd(matrix_list):
     product = matrix_list[0]
     i = 1
@@ -61,31 +61,44 @@ def tensorProd(matrix_list):
         product = np.kron(matrix_list[i],product)
         i += 1
     return product
-
+'''
 def HadamardArray(wire,total):     # Apply Hadamard matrix to wire i out of k wires
     Hadamard = 1/np.sqrt(2) * np.array([[1,1],
                                         [1,-1]])
-    M_list = []
-    for w in range(total):
+    matrix = np.identity(2)
+    if wire == 0:
+        matrix = Hadamard
+    w = 1
+    #M_list = []
+    while w < total:
         if w == total-wire-1:
-            M_list.append(Hadamard)
-            continue
-        M_list.append(np.identity(2))
+            matrix = np.kron(Hadamard, matrix)
+            #M_list.append(Hadamard)
+        else:
+            matrix = np.kron(np.identity(2), matrix)
+            #M_list.append(np.identity(2))
+        w += 1
     
-    matrix = tensorProd(M_list)
+    #matrix = tensorProd(M_list)
     return matrix
 
 def PhaseArray(wire,total,phi):
     Phase = np.array([[1,           0],
                       [0,   np.exp(phi*1.j)]])
-    M_list = []
-    for w in range(total):
+    #M_list = []
+    matrix = np.identity(2)
+    if wire == 0: matrix = Phase
+    w = 1
+    while w < total:
         if w == total-wire-1:
-            M_list.append(Phase)
+            matrix = np.kron(Phase, matrix)
+            #M_list.append(Phase)
         else:
-            M_list.append(np.identity(2))
+            matrix = np.kron(np.identity(2), matrix)
+            #M_list.append(np.identity(2))
+        w += 1
     
-    matrix = tensorProd(M_list)
+    #matrix = tensorProd(M_list)
     return matrix
 
 # Currently only apply to target wires that is next to a control wire.
@@ -95,6 +108,7 @@ def CNOTArray(control,target,total):
     elif control == target:
         print('Invalid placement of CNOT gate (control wire and target wire must be different).')
     else:
+        
         CNOTdown = np.array([[1,0,0,0],
                              [0,1,0,0],
                              [0,0,0,1],
@@ -105,19 +119,27 @@ def CNOTArray(control,target,total):
                            [0,0,1,0],
                            [0,1,0,0]])
         
-        M_list = []
         w = 0
+        if control == 0:
+            matrix = CNOTup
+            w += 1
+        elif target == 0:
+            matrix = CNOTdown
+            w += 1
+        else:
+            matrix = np.identity(2)
+        w += 1
+        
         while w < total:
             if target < control and w == total-1-control:
-                M_list.append(CNOTup)
+                matrix = np.kron(CNOTup, matrix)
                 w += 1
             elif target > control and w == total-1-target:
-                M_list.append(CNOTdown)
+                matrix = np.kron(CNOTdown, matrix)
                 w += 1
             else:
-                M_list.append(np.identity(2))
+                matrix = np.kron(np.identity(2), matrix)
             w += 1
-        matrix = tensorProd(M_list)
         return matrix
 
 def UnitaryMatrix(num_wires,input_circuit):
@@ -129,7 +151,7 @@ def UnitaryMatrix(num_wires,input_circuit):
             uni_matrix = PhaseArray(int(inp[1]),num_wires,float(inp[2])) @ uni_matrix
         elif inp[0] == 'CNOT':
             uni_matrix = CNOTArray(int(inp[1]),int(inp[2]), num_wires) @ uni_matrix
-    tol = 1E-10
+    tol = 1E-9
     uni_matrix.real[np.abs(uni_matrix.real) < tol] = 0
     uni_matrix.imag[np.abs(uni_matrix.imag) < tol] = 0
     return uni_matrix
@@ -172,7 +194,7 @@ def GetInputState(numberOfWires,input_circuit):
             return state
     else:
         return [(1,'0'*numberOfWires)]
-
+'''
 ############################ Quantum Simulator Ib #############################
 
 def computeState(vector, matrix_list):
@@ -183,42 +205,35 @@ def computeState(vector, matrix_list):
         v = matrix_list[0] @ vector
         m = matrix_list[1:]
         return computeState(v,m)
-
+'''
 ############################ Quantum Simulator Ic #############################
 
-def sparseKron(matrix_list):
-    product = sp.csr_matrix(matrix_list[0])
-    i = 1
-    while i < len(matrix_list):
-        sparse_M = sp.csr_matrix(matrix_list[i])
-        product = sp.kron(sparse_M,product)
-        i += 1
-    return product
-
 def HadamardSparse(wire,total):     # Apply Hadamard matrix to wire i out of k wires
-    Hadamard = 1/np.sqrt(2) * np.array([[1,1],
-                                        [1,-1]])
-    M_list = []
-    for w in range(total):
+    Hadamard = sp.csr_matrix(1/np.sqrt(2) * np.array([[1,1],
+                                                     [1,-1]]), dtype='complex')
+    if wire == 0:
+        matrix = Hadamard
+    else:
+        matrix = sp.csr_matrix(sp.identity(2,dtype='complex'))
+    for w in range(1,total):
         if w == total-wire-1:
-            M_list.append(Hadamard)
-            continue
-        M_list.append(np.identity(2))
-    
-    matrix = sparseKron(M_list)
+            matrix = sp.kron(Hadamard.tocsr(),matrix.tocsr(),'csr')
+        else:
+            matrix = sp.kron(sp.csr_matrix(sp.identity(2,dtype='complex')).tocsr(),matrix.tocsr(),'csr')
     return matrix.tocsr()
 
 def PhaseSparse(wire,total,phi):
-    Phase = np.array([[1,           0],
-                      [0,   np.exp(phi*1.j)]])
-    M_list = []
-    for w in range(total):
+    Phase = sp.csr_matrix([[1,           0],
+                           [0,   np.exp(phi*1.j)]])
+    if wire == 0:
+        matrix = Phase
+    else:
+        matrix = sp.csr_matrix(sp.identity(2,dtype='complex'))
+    for w in range(1,total):
         if w == total-wire-1:
-            M_list.append(Phase)
+            matrix = sp.kron(Phase,matrix,'csr')
         else:
-            M_list.append(np.identity(2))
-    
-    matrix = sparseKron(M_list)
+            matrix = sp.kron(sp.csr_matrix(sp.identity(2,dtype='complex')),matrix,'csr')
     return matrix.tocsr()
 
 # Currently only apply to target wires that is next to a control wire.
@@ -228,29 +243,35 @@ def CNOTSparse(control,target,total):
     elif control == target:
         print('Invalid placement of CNOT gate (control wire and target wire must be different).')
     else:
-        CNOTdown = np.array([[1,0,0,0],
-                             [0,1,0,0],
-                             [0,0,0,1],
-                             [0,0,1,0]])    
-    
-        CNOTup = np.array([[1,0,0,0],
-                           [0,0,0,1],
-                           [0,0,1,0],
-                           [0,1,0,0]])
-        
-        M_list = []
+        CNOTdown = sp.csr_matrix([[1,0,0,0],
+                                  [0,1,0,0],
+                                  [0,0,0,1],
+                                  [0,0,1,0]])
+        CNOTup = sp.csr_matrix([[1,0,0,0],
+                                [0,0,0,1],
+                                [0,0,1,0],
+                                [0,1,0,0]])
         w = 0
+        if control == 0:
+            matrix = CNOTup
+            w += 1
+        elif target == 0:
+            matrix = CNOTdown
+            w += 1
+        else:
+            matrix = sp.csr_matrix(sp.identity(2, dtype='complex'))
+        w += 1
+
         while w < total:
             if target < control and w == total-1-control:
-                M_list.append(CNOTup)
+                matrix = sp.kron(CNOTup.tocsr(), matrix.tocsr(),'csr')
                 w += 1
             elif target > control and w == total-1-target:
-                M_list.append(CNOTdown)
+                matrix = sp.kron(CNOTdown.tocsr(), matrix.tocsr(),'csr')
                 w += 1
             else:
-                M_list.append(np.identity(2))
+                matrix = sp.kron(sp.csr_matrix(sp.identity(2,dtype='complex')).tocsr(), matrix.tocsr(),'csr')
             w += 1
-        matrix = sparseKron(M_list)
         return matrix.tocsr()
 
 
