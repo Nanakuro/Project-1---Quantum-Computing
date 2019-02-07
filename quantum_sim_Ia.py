@@ -35,4 +35,23 @@ def runCircuitIa(stateFile):
     else:
         #qs.PrettyPrintBinary(out_state)
         qs.PrettyPrintInteger(out_state)
-        
+'''
+list_of_circuit_files = ['rand5.circuit',
+                         'rand6.circuit',
+                         'rand7.circuit',
+                         'rand8.circuit',
+                         'rand9.circuit',
+                         'rand10.circuit',
+                         'rand11.circuit',
+                         'rand12.circuit']
+print('Running Ia...')
+for i in range(len(list_of_circuit_files)):
+    file = list_of_circuit_files[i]
+    runCircuitIa(file)
+    if i == len(list_of_circuit_files)-1:
+        print('Done')
+        break
+    user_flag = input('Continue to run %s? ' % list_of_circuit_files[i+1][:-8])
+    if user_flag not in ['y','yes','1']:
+        break
+'''
