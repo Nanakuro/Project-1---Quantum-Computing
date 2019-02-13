@@ -11,12 +11,13 @@ import scipy.sparse as sp
 from random import choices
 
 def PrettyPrintBinary(state):
+    state.sort(key=lambda x: int(x[1],2))
     i = 1
     for s in state:
         if i == len(state):
             print('({:g}) |{:s}>'.format(s[0], s[1]))
         else:
-            print('({:g}) |{:s}>'.format(s[0], s[1]),end=' + ')
+            print('({:g}) |{:s}>'.format(s[0], s[1]),end=' + \n')
         i += 1
 
 def PrettyPrintInteger(state):
@@ -39,13 +40,13 @@ def StateToVec(state):
 
 def VecToState(vector):
     state = []
-    l = 0
+    l = len(vector).bit_length() - 1
     for i in range(len(vector)):
         v = vector[i]
         if v != 0.0:
             basis = "{0:b}".format(i)   # Convert base-10 integer to binary string
             state.append([v,basis])
-            l = len(basis)
+            #l = len(basis)
     for s in state:
         s[1] = s[1].zfill(l)
     #state = [tuple(s) for s in state]
@@ -55,7 +56,7 @@ def VecToState(vector):
 
 def HadamardArray(wire,total):     # Apply Hadamard matrix to wire i out of k wires
     Had = 1/np.sqrt(2) * np.array([[1,1],
-                                        [1,-1]])
+                                   [1,-1]])
     matrix = np.identity(2)
     if wire == total-1:     matrix = Had
     w = 1
@@ -149,11 +150,11 @@ def Measure(state):
     result = []
     probability = []
     for s in state:
-        probability.append(np.abs(s[0])**2)
+        probability.append(abs(s[0])**2)
         result.append(s[1])
     total_probability = 0
     for p in probability: total_probability += p
-    if np.abs(total_probability - 1) > 10**6:
+    if abs(total_probability - 1) > 10**6:
         print('Total probability does not add up to 1.')
         return
     return choices(result,weights=probability)[0]
@@ -175,6 +176,20 @@ def GetInputState(numberOfWires,input_circuit):
             return state
     else:
         return [[1,'0'*numberOfWires]]
+
+def GetRawInputState(fileName):
+    return_state = []
+    line_count = 0
+    with open(fileName, 'r') as f:
+        for line in f:
+            line_list = [ float(l) for l in line.strip().split() ]
+            amplitude = line_list[0] + line_list[1]*1.j
+            state = bin(line_count)[2:]
+            return_state.append([amplitude, state])
+            line_count += 1
+    line_count += 1
+    return_state = [ [s[0], s[1].zfill(line_count.bit_length() - 1)] for s in return_state]
+    return return_state
 
 ############################ Quantum Simulator Ic #############################
 
@@ -246,16 +261,28 @@ def CNOTSparse(control,target,total):
 
 ############################ Quantum Simulator II #############################
 
+def approximateState(state):
+    tol = 1E-8
+    for s in state.copy():
+        if abs(round(s[0].real,6)-s[0].real) < tol:
+            s[0] = complex(round(s[0].real,6),s[0].imag)
+        if abs(round(s[0].imag,6)-s[0].imag) < tol:
+            s[0] = complex(s[0].real,round(s[0].imag,6))
+        if s[0].imag == 0.0:
+            if s[0].real == 0.0:
+                state.remove(s)
+            else:
+                s[0] = s[0].real
+
 def rmDupe(state):
     for i,s_main in enumerate(state):
-        for j,s_check in enumerate(state[i+1:]):
-            if s_main[1] == s_check[1]:
+        for s_check in state[i+1:]:
+            if s_main[1] == s_check[1] and s_check[0] != 0:
                 s_main[0] += s_check[0]
-                del(state[i+j+1])
-        if s_main[0] == 0.0:
-            del(state[i])
-    
-        
+                s_check[0] = 0
+    approximateState(state)
+
+
 def Hadamard(wire, state):
     ind = 0
     while ind < len(state):
@@ -269,8 +296,8 @@ def Hadamard(wire, state):
             
             # Add a state '...1...'
             ind += 1
-            qubit = qubit[:wire] + '1' + qubit[wire+1:]
-            state.insert(ind,[amp,qubit])
+            new_qubit = qubit[:wire] + '1' + qubit[wire+1:]
+            state.insert(ind,[amp,new_qubit])
             #print(state)
         elif qubit[wire] == '1':
             amp /= 2**(0.5)
@@ -279,17 +306,16 @@ def Hadamard(wire, state):
             
             # Add a state '...0...'
             ind += 1
-            qubit = qubit[:wire] + '0' + qubit[wire+1:]
-            state.insert(ind,[amp,qubit])
+            new_qubit = qubit[:wire] + '0' + qubit[wire+1:]
+            state.insert(ind,[amp,new_qubit])
             
         ind += 1
     rmDupe(state)
-    
+
 def Phase(wire, phi, state):
     for s in state:
         if s[1][wire] == '1':
             s[0] *= np.exp(phi*1.j)
-    rmDupe(state)
 
 def CNOT(control, target, state):
     for i,s in enumerate(state):
@@ -299,8 +325,7 @@ def CNOT(control, target, state):
                 state[i][1] = qubit[:target] + '1' + qubit[target+1:]
             elif qubit[target] == '1':
                 state[i][1] = qubit[:target] + '0' + qubit[target+1:]
-    rmDupe(state)
-    
+
 ############################## Non-Atomic Gates ###############################
 
 def NOT(wire, state):
@@ -322,12 +347,13 @@ def CRz(control, target, phi, state):
 
 def CPhase(control, target, phi, state):
     CRz(control, target, phi, state)
-    Phase(control, phi/2.0)
+    Phase(control, phi/2.0, state)
 
 def SWAP(w1, w2, state):
-    CNOT(w1, w2, state)
-    CNOT(w2, w1, state)
-    CNOT(w1, w2, state)
+    if w1 != w2:
+        CNOT(w1, w2, state)
+        CNOT(w2, w1, state)
+        CNOT(w1, w2, state)
 
 ################################ Pre-Compiling ################################
 
@@ -418,3 +444,68 @@ print(myInputState)
 ###############################################################################
 
 
+def reverseState(top, state):
+    i = 0
+    while i < top - i:
+        SWAP(i, top-1-i, state)
+        i += 1
+
+def QFT(t_wires, state):
+    tot_wires = len(state[0][1])
+    wire_n = t_wires - 1
+    b_wires = tot_wires - t_wires
+    if wire_n == 0:
+        #print('H %d' % b_wires)
+        Hadamard(b_wires, state)
+    else:
+        QFT(t_wires-1, state)
+        for w in range(wire_n):
+            ind = tot_wires - 1 - w
+            phase = np.pi/2**(ind-b_wires)
+            #print('CPhase %d %d %f' % (b_wires, ind, phase))
+            CPhase(b_wires, ind, phase, state)
+        #print('H %d' % (b_wires))
+        Hadamard(b_wires, state)
+
+def invQFT(t_wires, state):
+    tot_wires = len(state[0][1])
+    wire_ind = t_wires - 1
+    b_wires = tot_wires - t_wires
+    if wire_ind == 0:
+        #print('H %d' % b_wires)
+        Hadamard(b_wires, state)
+    else:
+        #print('H %d' % b_wires)
+        Hadamard(b_wires, state)
+        for w in range(wire_ind):
+            ind = b_wires+w+1
+            phase = -np.pi/2**(ind-b_wires)
+            #print('CPhase %d %d %f' % (b_wires, ind, phase))
+            CPhase(b_wires, ind, phase, state)
+        invQFT(t_wires-1, state)
+        
+def PhaseSeries(top, phase, state):
+    bot = len(state[0][1]) - top
+    for t in range(top):
+        ind_top = top-1-t
+        for b in range(bot):
+            big_phase = phase*2**(t)
+            #print('CPhase %d %d %f' % (ind_top, top+b, phase))
+            CPhase(ind_top, top+b, big_phase, state)
+            rmDupe(state)
+    
+def ShiftRight(bot_wires, state):
+    for b in range(bot_wires):
+        reverseState(len(state[0][1])-1, state)
+        reverseState(len(state[0][1]), state)
+        rmDupe(state)
+    
+def ShiftLeft(bot_wires, state):
+    for b in range(bot_wires):
+        reverseState(len(state[0][1]), state)
+        reverseState(len(state[0][1])-1, state)
+        rmDupe(state)
+
+#myState = [[1.0,'001']]
+#QFT(3,myState)
+#PrettyPrintBinary(myState)

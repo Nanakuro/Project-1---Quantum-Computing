@@ -24,10 +24,7 @@ def runCircuitIIwithoutCompile(circuitFile):
         elif inp[0] == 'CPhase':    qs.CPhase(int(inp[1]), int(inp[2]), float(inp[3]), the_state)
         elif inp[0] == 'SWAP':      qs.SWAP(int(inp[1]), int(inp[2]), the_state)
         
-    tol = 1E-6
-    for s in the_state:
-        if abs(round(s[0].real)-s[0].real) < tol: s[0] = complex(round(s[0].real),s[0].imag)
-        if abs(round(s[0].imag)-s[0].imag) < tol: s[0] = complex(s[0].real,round(s[0].imag))
+    qs.approximateState(the_state)
     
     if in_circuit[-1][0] == 'MEASURE':
         count = 10000
@@ -43,11 +40,12 @@ def runCircuitIIwithoutCompile(circuitFile):
         plt.ylabel('Count')
         plt.savefig('measure_circuit_Ic_%d_wires.png' % n_wires)
     else:
-        #qs.PrettyPrintBinary(the_state)
-        qs.PrettyPrintInteger(the_state)
+        qs.PrettyPrintBinary(the_state)
+        #qs.PrettyPrintInteger(the_state)
 
 
 def runCircuitIIwithCompile(inFile):
+    qs.preCompile(inFile)
     runCircuitIIwithoutCompile('basic_' + inFile)
     
-runCircuitIIwithoutCompile('non_atomic_gates.circuit')
+#runCircuitIIwithoutCompile('test_QFT.circuit')
