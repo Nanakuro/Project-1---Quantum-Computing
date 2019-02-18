@@ -40,6 +40,8 @@ def runCircuitIb(stateFile):
     else:
         #qs.PrettyPrintBinary(out_state)
         qs.PrettyPrintInteger(out_state)
+runCircuitIb('rand.circuit')
+
 '''
 list_of_circuit_files = ['rand5.circuit',
                          'rand6.circuit',

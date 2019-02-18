@@ -35,17 +35,18 @@ def runCircuitIIwithoutCompile(circuitFile):
             measurements.append(index)
         fig = plt.figure()
         plt.hist(measurements,bins=2**n_wires)
-        plt.title('Measurement histogram - Ic (%d wires)' % n_wires)
+        plt.title('Measurement histogram - II (%d wires)' % n_wires)
         plt.xlabel('State')
         plt.ylabel('Count')
-        plt.savefig('measure_circuit_Ic_%d_wires.png' % n_wires)
+        plt.savefig('measure_circuit_II_%d_wires.png' % n_wires)
     else:
-        qs.PrettyPrintBinary(the_state)
-        #qs.PrettyPrintInteger(the_state)
+        #qs.PrettyPrintBinary(the_state)
+        qs.PrettyPrintInteger(the_state)
+    return the_state
 
 
 def runCircuitIIwithCompile(inFile):
     qs.preCompile(inFile)
     runCircuitIIwithoutCompile('basic_' + inFile)
     
-#runCircuitIIwithoutCompile('test_QFT.circuit')
+#runCircuitIIwithCompile('test.circuit')

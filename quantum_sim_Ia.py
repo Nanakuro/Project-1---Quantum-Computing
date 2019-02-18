@@ -12,7 +12,7 @@ from matplotlib import pyplot as plt
 
 def runCircuitIa(stateFile):
     n_wires, in_circuit = qs.ReadInput(stateFile)
-    circuit_matrix = qs.UnitaryMatrix(n_wires, in_circuit)
+    circuit_matrix = qs.CircuitMatrix(n_wires, in_circuit)
     in_vector = qs.StateToVec(qs.GetInputState(n_wires, in_circuit))
     out_vector = circuit_matrix @ in_vector
     tol = 1E-9
@@ -35,6 +35,7 @@ def runCircuitIa(stateFile):
     else:
         #qs.PrettyPrintBinary(out_state)
         qs.PrettyPrintInteger(out_state)
+runCircuitIa('input.circuit')
 '''
 list_of_circuit_files = ['rand5.circuit',
                          'rand6.circuit',

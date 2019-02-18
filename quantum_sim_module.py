@@ -8,6 +8,7 @@ Created on Tue Jan 29 22:17:03 2019
 
 import numpy as np
 import scipy.sparse as sp
+from math import log2, ceil
 from random import choices
 
 def PrettyPrintBinary(state):
@@ -27,7 +28,7 @@ def PrettyPrintInteger(state):
         if i == len(state):
             print('({:g}) |{:g}>'.format(s[0], num))
         else:
-            print('({:g}) |{:g}>'.format(s[0], num),end=' + ')
+            print('({:g}) |{:g}>'.format(s[0], num),end=' + \n')
         i += 1
     
 def StateToVec(state):  
@@ -124,7 +125,7 @@ def CNOTArray(control,target,total):
             w += 1
         return matrix
 
-def UnitaryMatrix(num_wires,input_circuit):
+def CircuitMatrix(num_wires,input_circuit):
     uni_matrix = np.identity(2**num_wires)
     for inp in input_circuit:
         if inp[0] == 'H':
@@ -262,12 +263,12 @@ def CNOTSparse(control,target,total):
 ############################ Quantum Simulator II #############################
 
 def approximateState(state):
-    tol = 1E-8
+    tol = 1E-14
     for s in state.copy():
-        if abs(round(s[0].real,6)-s[0].real) < tol:
-            s[0] = complex(round(s[0].real,6),s[0].imag)
-        if abs(round(s[0].imag,6)-s[0].imag) < tol:
-            s[0] = complex(s[0].real,round(s[0].imag,6))
+        if abs(round(s[0].real,14)-s[0].real) < tol:
+            s[0] = complex(round(s[0].real,14),s[0].imag)
+        if abs(round(s[0].imag,14)-s[0].imag) < tol:
+            s[0] = complex(s[0].real,round(s[0].imag,14))
         if s[0].imag == 0.0:
             if s[0].real == 0.0:
                 state.remove(s)
@@ -439,6 +440,7 @@ for gates in circuit_gate_list:
 
 print(myInputState)
 '''
+
 ###############################################################################
 ############################### Phase Estimation ##############################
 ###############################################################################
@@ -447,6 +449,7 @@ print(myInputState)
 def reverseState(top, state):
     i = 0
     while i < top - i:
+        #print('SWAP %d %d' %(i, top-1-i))
         SWAP(i, top-1-i, state)
         i += 1
 
@@ -490,10 +493,20 @@ def PhaseSeries(top, phase, state):
         ind_top = top-1-t
         for b in range(bot):
             big_phase = phase*2**(t)
-            #print('CPhase %d %d %f' % (ind_top, top+b, phase))
+            #print('CPhase %d %d %f' % (ind_top, top+b, big_phase))
             CPhase(ind_top, top+b, big_phase, state)
             rmDupe(state)
-    
+
+def CRzSeries(top, phase, state):
+    bot = len(state[0][1]) - top
+    for t in range(top):
+        ind_top = top-1-t
+        for i in range(2**t):
+            for b in range(bot):
+                #print('CRz %d %d %f' % (ind_top, top+b, big_phase))
+                CRz(ind_top, top+b, phase, state)
+                rmDupe(state)
+
 def ShiftRight(bot_wires, state):
     for b in range(bot_wires):
         reverseState(len(state[0][1])-1, state)
@@ -506,6 +519,110 @@ def ShiftLeft(bot_wires, state):
         reverseState(len(state[0][1])-1, state)
         rmDupe(state)
 
-#myState = [[1.0,'001']]
-#QFT(3,myState)
-#PrettyPrintBinary(myState)
+def GetMaxTheta(top_wires, state):
+    amp_list = [ abs(s[0]) for s in state ]
+    max_state = state[amp_list.index(max(amp_list))][1]
+    return sum([int(s)/2**(i+1) for i,s in enumerate(max_state[:top_wires])])
+'''
+def GetBottomPNOTCircuit(top_wires, fileName):
+    n_wires, in_circuit = ReadInput(fileName)
+    the_state = GetInputState(n_wires,in_circuit)
+    for inp in in_circuit:
+        if inp[0] == 'P':           Phase(int(inp[1]), float(inp[2]), the_state)
+        elif inp[0] == 'NOT':       NOT(int(inp[1]), the_state)
+    rmDupe(the_state)
+    State = [ [s[0], s[1].zfill(top_wires+len(s[1]))] for s in the_state ]
+    return State
+'''
+def PhaseEstimation(top_wires, U_function, state, phase=0.9,x_val=0, N_val=0):
+    bot_wires = len(state[0][1]) - top_wires
+
+    for i in range(top_wires):
+        #print('H %d' % i)
+        Hadamard(i, state)
+    if U_function == 'CPhase':
+        PhaseSeries(top_wires, phase, state)
+    elif U_function == 'CRz':
+        print(compileCRz(['CRz', 0, 1, phase]))
+        CRzSeries(top_wires, phase, state)
+    elif U_function == 'CFUNC':
+        #bot_wires = len(state[0][1]) - top_wires
+        CFUNCSeries(bot_wires, 'stateModOp', x_val, N_val, state)
+        #CFUNCSeriesSlow(bot_wires, 'stateModOp', x_val, N_val, state)
+    rmDupe(state)
+    #print(state)
+    
+    ShiftRight(bot_wires, state)
+    invQFT(top_wires, state)
+    ShiftLeft(bot_wires, state)
+    reverseState(top_wires, state)
+    rmDupe(state)
+    return state
+
+
+###############################################################################
+############################### Shor's Algorithm ##############################
+###############################################################################
+
+def stateModOp(x,N,basis):
+    n_qubits = len(basis[1])
+    j_state = int(basis[1],2)
+    if j_state < N:
+        basis[1] = bin((j_state * x) % N)[2:].zfill(n_qubits)
+
+def FUNC(start, bot_wires, func_name, x_val, N_val, s):
+    tot_wires = len(s[1])
+    end = start + bot_wires
+    bot_state = [ s[0],s[1][start:end] ]
+    if end > tot_wires:
+        print('Inconsistent number of wires.')
+        return
+    operator = globals()[func_name]
+    operator(x_val, N_val, bot_state)
+    s[1] = s[1][:start] + bot_state[1]
+    #print(s[1])
+
+def CFUNC(ctrl, start, bot_wires, func_name, x_val, N_val, state):
+    for s in state:
+        if s[1][ctrl] == '1':
+            FUNC(start, bot_wires, func_name, x_val, N_val, s)
+            #print(s)
+
+def CFUNCSeries(bot_wires, func_name, x_val, N_val, state):
+    top_wires = len(state[0][1]) - bot_wires
+    for t_wire in range(top_wires):
+        ctrl_top = top_wires-1-t_wire
+        #print('CFUNC %d %d %d xymodN %d %d' % (ctrl_top, top_wires, bot_wires, x_val**(2**t_wire), N_val) )
+        CFUNC(ctrl_top, top_wires, bot_wires, func_name, x_val**(2**(t_wire)), N_val, state)
+        #rmDupe(state)
+
+def CFUNCSeriesSlow(bot_wires, func_name, x_val, N_val, state):
+    top_wires = len(state[0][1]) - bot_wires
+    for t_wire in range(top_wires):
+        ctrl_top = top_wires-1-t_wire
+        for t in range(2**t_wire):
+            #print('CFUNC %d %d %d xymodN %d %d' % (ctrl_top, top_wires, bot_wires, x_val**(2**t_wire), N_val) )
+            CFUNC(ctrl_top, top_wires, bot_wires, func_name, x_val, N_val, state)
+           
+#print(compileSWAP(['SWAP', 2, 5, np.pi]))
+
+'''
+x = 2
+N = 15
+bot = int(ceil(log2(N)))
+top = 2*bot + 1
+State = [[np.sqrt(0.5), '1'*top + '1010'],[np.sqrt(0.5),'1'*top + '0110']]   
+
+#CFUNC(0,top, bot, 'stateModOp', 2,15,State)
+#CFUNC(top, bot, 'stateModOp', 2,15,State[1])
+print(State)
+'''
+'''
+top = 5
+#myState = [[1.0,'00000']]
+myState = GetRawInputState('myInputState.dms')
+print(top)
+QFT(top, myState)
+reverseState(top, myState)
+PrettyPrintBinary(myState)
+'''
